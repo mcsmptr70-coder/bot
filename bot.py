@@ -91,9 +91,9 @@ SILME_LAFLARI = [
 ]
 
 DUZENLEME_LAFLARI = [
-    "düzenlemiş bir de, sanki ilk halini görmedik 👀",
-    "mesajı editleyince daha mantıklı olmamış haberin olsun.",
-    "ilk yazdığın da boştu, düzenlediğin de boş 💀",
+    "arasın annesini sikiyim Düzenleme👀",
+    "amınevladı düzenleme işte.",
+    "Orospu Evladı Düzenlemesene Yediremedinmi 💀",
 ]
 
 intents = discord.Intents.default()
