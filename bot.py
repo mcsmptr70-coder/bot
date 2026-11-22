@@ -136,7 +136,7 @@ def guvenli_hesap(node):
 # ============================================================
 #  OLAYLAR
 # ============================================================
-SES_KANAL_ID = int(os.getenv("1572307960430858326", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
+SES_KANAL_ID = int(os.getenv("SES_KANAL_ID", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
 ses_hedef: dict[int, int] = {}  # sunucu_id -> kalınacak ses kanalı id
 
 
@@ -200,6 +200,57 @@ async def git(inter: discord.Interaction):
         await vc.disconnect(force=True)
         return await inter.response.send_message("👋 Çıktım.")
     await inter.response.send_message("Zaten bir ses kanalında değilim.", ephemeral=True)
+
+
+ses_atma_aktif = True  # /sesatma komutuyla açılıp kapanır
+
+SES_ATMA_LAFLARI = [
+    "Hop! Nereye? Bu kanalda işin yok.",
+    "Sese girmeye çalıştın ama kapıdan döndün. Güle güle.",
+    "Giriş yasak. Bugünlük de bu kadar.",
+    "Yine mi sen? Dışarı.",
+]
+
+
+@bot.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    """Hedef kullanıcı bir ses kanalına girerse otomatik olarak atılır."""
+    if not ses_atma_aktif or member.id != HEDEF_ID:
+        return
+    if after.channel is None or after.channel == before.channel:
+        return
+    kanal = after.channel
+    try:
+        await member.move_to(None, reason="Otomatik ses atma")
+    except discord.Forbidden:
+        print("[SESATMA] Yetki yok: botun 'Üyeleri Taşı' (Move Members) yetkisi ve rolü hedefin üstünde olmalı.")
+        return
+    except discord.HTTPException as e:
+        print(f"[SESATMA] Hata: {e!r}")
+        return
+    try:
+        await kanal.send(f"{member.mention} {random.choice(SES_ATMA_LAFLARI)}", delete_after=15)
+    except Exception:
+        pass
+
+
+@bot.tree.command(name="sesatma", description="Hedef kullanıcıyı sesten otomatik atmayı aç/kapat")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(move_members=True)
+@app_commands.choices(durum=[
+    app_commands.Choice(name="Aç", value="ac"),
+    app_commands.Choice(name="Kapat", value="kapat"),
+])
+async def sesatma(inter: discord.Interaction, durum: app_commands.Choice[str]):
+    global ses_atma_aktif
+    ses_atma_aktif = durum.value == "ac"
+    await inter.response.send_message(f"Otomatik ses atma: **{'AÇIK' if ses_atma_aktif else 'KAPALI'}**")
+
+
+@sesatma.error
+async def sesatma_hata(inter: discord.Interaction, hata):
+    if isinstance(hata, app_commands.MissingPermissions):
+        await inter.response.send_message("Yetkin yok.", ephemeral=True)
 
 
 @bot.event
