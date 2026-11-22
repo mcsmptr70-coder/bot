@@ -162,7 +162,7 @@ session: aiohttp.ClientSession | None = None
 son_isim_tepki: dict[int, float] = {}
 son_ifsa_tepki: dict[int, float] = {}
 AI_KILIT = asyncio.Lock()
-AI_HATA = "AI servisi şu an cevap vermiyor, biraz sonra tekrar dene."
+AI_HATA = "arasın annesine sorayım bunun cevabını benden bilmiyorum"
 
 
 # ============================================================
