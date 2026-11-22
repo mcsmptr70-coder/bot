@@ -91,9 +91,9 @@ SILME_LAFLARI = [
 ]
 
 DUZENLEME_LAFLARI = [
-    "arasın annesini sikiyim Düzenleme👀",
+    "arasın annesini sikiyim Düzenleme",
     "amınevladı düzenleme işte.",
-    "Orospu Evladı Düzenlemesene Yediremedinmi 💀",
+    "Orospu Evladı Düzenlemesene Yediremedinmi ",
 ]
 
 intents = discord.Intents.default()
