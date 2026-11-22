@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 import aiohttp
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 # ============================================================
 #  AYARLAR
@@ -18,7 +18,7 @@ from discord.ext import commands
 TOKEN = os.getenv("DISCORD_TOKEN", "")
 HEDEF_ID = 973573136685608970          # Ters cevap verilecek kullanıcı
 RASTGELE_TERS_ORAN = 0.15              # Hedefin mesajlarına kendiliğinden cevap verme olasılığı (0-1)
-ISIM_TETIK = ["n0rx123,aras,Aras"]               # Bu isimler mesajda geçerse bot ters moda girer
+ISIM_TETIK = ["n0rx123"]               # Bu isimler mesajda geçerse bot ters moda girer
 ISIM_BEKLEME = 8                       # Aynı kanalda tekrar tepki vermeden önce bekleme (saniye)
 
 # Keysiz AI (API anahtarı gerekmez). Servis değişirse sadece burayı güncelle.
@@ -136,8 +136,80 @@ def guvenli_hesap(node):
 # ============================================================
 #  OLAYLAR
 # ============================================================
+SES_KANAL_ID = int(os.getenv("SES_KANAL_ID", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
+ses_hedef: dict[int, int] = {}  # sunucu_id -> kalınacak ses kanalı id
+
+
+async def sese_baglan(kanal: discord.abc.Connectable):
+    guild = kanal.guild
+    vc = guild.voice_client
+    if vc and vc.is_connected():
+        if vc.channel.id != kanal.id:
+            await vc.move_to(kanal)
+        return vc
+    if vc:
+        try:
+            await vc.disconnect(force=True)
+        except Exception:
+            pass
+    return await kanal.connect(reconnect=True, self_deaf=True)
+
+
+@tasks.loop(seconds=30)
+async def ses_bekci():
+    """Her 30 sn'de ses bağlantısını kontrol eder; düştüyse/taşındıysa geri döner."""
+    for guild_id, kanal_id in list(ses_hedef.items()):
+        guild = bot.get_guild(guild_id)
+        kanal = bot.get_channel(kanal_id)
+        if guild is None or kanal is None:
+            continue
+        vc = guild.voice_client
+        if vc is None or not vc.is_connected() or vc.channel.id != kanal_id:
+            try:
+                await sese_baglan(kanal)
+                print(f"[SES] {guild.name} / {kanal.name} kanalına bağlandı.")
+            except Exception as e:
+                print(f"[SES] Bağlanamadı: {e!r}")
+
+
+@bot.tree.command(name="gel", description="Ses kanalına girer ve çıkmadan AFK bekler")
+@app_commands.guild_only()
+@app_commands.describe(kanal="Girilecek ses kanalı (boşsa bulunduğun kanal)")
+async def gel(inter: discord.Interaction, kanal: discord.VoiceChannel = None):
+    hedef = kanal or (inter.user.voice.channel if inter.user.voice else None)
+    if hedef is None:
+        return await inter.response.send_message("Bir ses kanalına gir ya da kanal seç.", ephemeral=True)
+    await inter.response.defer()
+    try:
+        await sese_baglan(hedef)
+    except Exception as e:
+        return await inter.followup.send(f"Bağlanamadım: `{e}`\nBotun kanala Bağlan/Konuş yetkisi var mı?")
+    ses_hedef[inter.guild_id] = hedef.id
+    await inter.followup.send(
+        f"🔊 **{hedef.name}** kanalındayım, çıkmayacağım.\n"
+        f"Railway yeniden başlasa da dönmesi için Variables'a `SES_KANAL_ID` = `{hedef.id}` ekle."
+    )
+
+
+@bot.tree.command(name="git", description="Ses kanalından çıkar")
+@app_commands.guild_only()
+async def git(inter: discord.Interaction):
+    ses_hedef.pop(inter.guild_id, None)
+    vc = inter.guild.voice_client
+    if vc:
+        await vc.disconnect(force=True)
+        return await inter.response.send_message("👋 Çıktım.")
+    await inter.response.send_message("Zaten bir ses kanalında değilim.", ephemeral=True)
+
+
 @bot.event
 async def on_ready():
+    if SES_KANAL_ID:
+        k = bot.get_channel(SES_KANAL_ID)
+        if k is not None:
+            ses_hedef[k.guild.id] = k.id
+    if not ses_bekci.is_running():
+        ses_bekci.start()
     await bot.tree.sync()
     await bot.change_presence(activity=discord.Game("/yardim | @beni etiketle"))
     print(f"{bot.user} aktif! {len(bot.guilds)} sunucuda.")
