@@ -137,7 +137,7 @@ def guvenli_hesap(node):
 #  OLAYLAR
 # ============================================================
 SES_KANAL_ID = int(os.getenv("SES_KANAL_ID", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
-ses_hedef: dict[int, int] = {}  # sunucu_id -> kalınacak ses kanalı id
+ses_hedef: dict[int, int] = {1572307960430858326}  # sunucu_id -> kalınacak ses kanalı id
 
 
 async def sese_baglan(kanal: discord.abc.Connectable):
