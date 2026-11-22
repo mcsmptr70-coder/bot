@@ -137,7 +137,7 @@ def guvenli_hesap(node):
 #  OLAYLAR
 # ============================================================
 SES_KANAL_ID = int(os.getenv("SES_KANAL_ID", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
-ses_hedef: dict[int, int] = {}  # sunucu_id -> kalınacak ses kanalı id
+ses_hedef: dict[int, int] = {1572307960430858326}  # sunucu_id -> kalınacak ses kanalı id
 
 
 async def sese_baglan(kanal: discord.abc.Connectable):
@@ -155,9 +155,9 @@ async def sese_baglan(kanal: discord.abc.Connectable):
     return await kanal.connect(reconnect=True, self_deaf=True)
 
 
-@tasks.loop(seconds=30)
+@tasks.loop(seconds=15)
 async def ses_bekci():
-    """Her 30 sn'de ses bağlantısını kontrol eder; düştüyse/taşındıysa geri döner."""
+    """Her 15 sn'de ses bağlantısını kontrol eder; düştüyse/taşındıysa geri döner."""
     for guild_id, kanal_id in list(ses_hedef.items()):
         guild = bot.get_guild(guild_id)
         kanal = bot.get_channel(kanal_id)
@@ -214,7 +214,22 @@ SES_ATMA_LAFLARI = [
 
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    """Hedef kullanıcı bir ses kanalına girerse otomatik olarak atılır."""
+    """Botun kendi ses durumu + hedef kullanıcı bir ses kanalına girerse otomatik atma."""
+    # Bot sesten düştüyse (atıldı/bağlantı koptu) 5 sn içinde geri dön
+    if member.id == bot.user.id and after.channel is None and member.guild.id in ses_hedef:
+        print(f"[SES] Bot sesten düştü ({member.guild.name}), geri dönülüyor...")
+        await asyncio.sleep(5)
+        kanal_id = ses_hedef.get(member.guild.id)
+        kanal = bot.get_channel(kanal_id) if kanal_id else None
+        vc = member.guild.voice_client
+        if kanal is not None and (vc is None or not vc.is_connected()):
+            try:
+                await sese_baglan(kanal)
+                print("[SES] Geri bağlandı.")
+            except Exception as e:
+                print(f"[SES] Geri bağlanamadı: {e!r}")
+        return
+
     if not ses_atma_aktif or member.id != HEDEF_ID:
         return
     if after.channel is None or after.channel == before.channel:
