@@ -69,7 +69,7 @@ gecmis = defaultdict(lambda: deque(maxlen=8))  # kanal başına kısa hafıza
 DATA_DIR = os.getenv("DATA_DIR", ".")
 HAFIZA_DOSYA = os.path.join(DATA_DIR, "hafiza.json")
 kisi_gecmis: dict[str, list] = {}                      # "u:ID" -> son konuşmalar
-hedefler: dict[int, list[str]] = {HEDEF_ID: list(ISIM_TETIK)}  # hedef_id -> tetik isimleri
+hedefler: dict[int, list[str]] = {973573136685608970: list(n0rx123)}  # hedef_id -> tetik isimleri
 
 
 def hafiza_kaydet():
