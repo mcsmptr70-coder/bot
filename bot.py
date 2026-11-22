@@ -137,7 +137,7 @@ def guvenli_hesap(node):
 #  OLAYLAR
 # ============================================================
 SES_KANAL_ID = int(os.getenv("SES_KANAL_ID", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
-ses_hedef: dict[int, int] = {1572307960430858326}  # sunucu_id -> kalınacak ses kanalı id
+ses_hedef: dict[int, int] = {}  # sunucu_id -> kalınacak ses kanalı id
 
 
 async def sese_baglan(kanal: discord.abc.Connectable):
@@ -210,7 +210,8 @@ async def on_ready():
             ses_hedef[k.guild.id] = k.id
     if not ses_bekci.is_running():
         ses_bekci.start()
-    await bot.tree.sync()
+    synced = await bot.tree.sync()
+    print(f"[SYNC] {len(synced)} komut: {', '.join(c.name for c in synced)}")
     await bot.change_presence(activity=discord.Game("/yardim | @beni etiketle"))
     print(f"{bot.user} aktif! {len(bot.guilds)} sunucuda.")
 
