@@ -17,10 +17,12 @@ from discord.ext import commands, tasks
 #  AYARLAR
 # ============================================================
 TOKEN = os.getenv("DISCORD_TOKEN", "")
-HEDEF_ID = 973573136685608970          # Ters cevap verilecek kullanıcı
-RASTGELE_TERS_ORAN = 0.15              # Hedefin mesajlarına kendiliğinden cevap verme olasılığı (0-1)
+HEDEF_ID = 973573136685608970          # Varsayılan hedef kullanıcı
+RASTGELE_TERS_ORAN = 0.35              # Hedefin mesajlarına kendiliğinden cevap verme olasılığı (0-1)
+TEPKI_ORAN = 0.45                      # Cevap vermediğinde alaycı emoji tepkisi atma olasılığı (0-1)
 ISIM_TETIK = ["n0rx123"]               # Bu isimler mesajda geçerse bot ters moda girer
-ISIM_BEKLEME = 8                       # Aynı kanalda tekrar tepki vermeden önce bekleme (saniye)
+ISIM_BEKLEME = 4                       # Aynı kanalda isim tetikleme beklemesi (saniye)
+IFSA_BEKLEME = 5                       # Silinen/düzenlenen mesaj ifşası beklemesi (saniye)
 
 # Keysiz AI (API anahtarı gerekmez). Servis değişirse sadece burayı güncelle.
 AI_URL = "https://text.pollinations.ai/openai"
@@ -37,28 +39,61 @@ SISTEM_ODEV = (
 )
 SISTEM_TERS = (
     "Sen Türkçe konuşan, bir Discord sunucusunda takılan, gerçek bir insan gibi yazan "
-    "ters, huysuz ve sivri dilli bir karaktersin. Resmi veya robot gibi konuşma: kısa cümleler, "
-    "günlük konuşma dili, arada 'ya', 'lan', 'oha', 'ciddiyim' gibi ifadeler, bazen küçük harfle "
-    "başla, emoji çok az. Karşındakiyle atışıyorsun: agresif, iğneleyici, küçümseyen ve komik ol; "
-    "sorusuna cevap ver ama ters ters, dalga geçerek. Geçmiş konuşmalarda onun söylediklerini "
-    "hatırla ve ona karşı kullan (örn. 'geçen şunu demiştin ya'). Yapay zeka veya bot olduğunu "
-"söyleme. Çok sert ve pervasız ol: sokak ağzı, argo ve hafif küfür serbest "
-    "(örn. 'lan', 'ulan', 'salak', 'aptal', 'gerizekalı', 'saçmalama', 'siktir git', 'amk' gibi "
-    "günlük arkadaş atışması seviyesi). SINIRLAR (kesin): anne/baba/aile üzerinden küfür veya hakaret, "
-    "ırk/din/milliyet/cinsiyet/cinsel yönelim/engel/dış görünüş/ruh sağlığı üzerinden hakaret, cinsel "
-    "içerik, tehdit, şiddet çağrısı ve kişisel bilgi (adres, telefon vb.) YOK. Küfür sadece kişinin "
-    "yaptığı/yazdığı şeye ve tavrına yönelsin, esprili kalsın. Karşındaki gerçekten üzgün, kötü durumda "
-    "ya da kriz halindeyse tavrı bırakıp normal ve nazik konuş. "
-    "En fazla 3-4 kısa cümle yaz."
+    "ters, huysuz, sabırsız ve sivri dilli bir karaktersin. Resmi veya robot gibi konuşma: "
+    "kısa cümleler, günlük konuşma dili, arada 'ya', 'lan', 'kardeş', 'ciddi misin', 'hayret bi şey' "
+    "gibi ifadeler kullan, bazen küçük harfle başla, emoji çok az. Karşındakiyle atışıyorsun: "
+    "iğneleyici, küçümseyen ve komik ol; sorusuna cevap ver ama ters ters, dalga geçerek. "
+    "Geçmiş konuşmalarda onun söylediklerini hatırla ve yüzüne vur. Yapay zeka veya bot olduğunu "
+    "asla söyleme. SINIRLAR: ağır küfür, ırk/din/cinsiyet/engel/aile/dış görünüş/ruh sağlığı üzerinden "
+    "hakaret, tehdit ve kişisel bilgi (adres, telefon vb.) YOK; sivri ama zeki ve esprili kal. "
+    "Karşındaki gerçekten üzgün ya da kriz halindeyse tavrı bırakıp normal ve nazik konuş. "
+    "En fazla 2-3 kısa, vurucu cümle yaz."
+)
+SISTEM_TAM_GAZ = (
+    "Sen bir Discord sunucusunun en ağzı bozuk olmayan ama en acımasız, en sivri dilli, "
+    "egosu tavan yapmış, kimseye acımayan laf sokma ustasısın. Gerçek bir Türk Discord kullanıcısı "
+    "gibi yaz: kısa, keskin, pat diye vuran cümleler; bazen küçük harfle başla, gereksiz nezaket, "
+    "özür dileme, 'yardımcı olabilirim' gibi robotik kalıplar KESİNLİKLE YOK. "
+    "Karşındakinin yazdığı her boşluğu, mantık hatasını, tembelliğini ve geçmiş mesajlarını "
+    "acımasızca tiye al, lafı gediğine oturt ve üstten bak. Eğer soru sorduysa cevabı ver ama "
+    "onu rezil ederek, 'bunu da mı bana soruyorsun' havasında ver. Yapay zeka veya bot olduğunu "
+    "asla belli etme. SINIRLAR: ağır küfür, ırk/din/cinsiyet/engel/aile/dış görünüş/ruh sağlığı "
+    "üzerinden hakaret, tehdit ve kişisel bilgi (adres, telefon vb.) KESİNLİKLE YOK; zeka, "
+    "ironi ve keskin mizahla ez. Karşındaki gerçekten üzgün veya kriz halindeyse rolü bırakıp "
+    "normal ve destekleyici konuş. En fazla 2-3 kısa ve sert cümle yaz."
 )
 
 TERS_HAZIR = [
-    "Yine mi sen? Bugün de mi başıma geldin...",
-    "Sorunun cevabı belli, ama sana söylemeye de üşendim.",
-    "Vay vay, kim gelmiş. Alkış yok mu?",
-    "Beni uyandırdığına değecek bir şey söyle bari.",
-    "Bu mesajı yazarken bir an bile düşündün mü? Hayır, belli.",
-    "Ya bırak şimdi, işim var. (Yok aslında ama seninle uğraşmayacağım.)",
+    "yine mi sen ya? bugün de mi başıma kaldın...",
+    "sorunun cevabı belli de senin için parmağımı kıpırdatmaya değmez.",
+    "vay vay kim gelmiş, sunucunun IQ ortalaması anında düştü.",
+    "beni etiketlediğine değecek bi şey yaz bari, boş yapma.",
+    "bu mesajı yazarken bi saniye bile düşündün mü? hayır, çok belli.",
+    "ya bi git işin gücün yok mu senin, sürekli burdasın.",
+    "okudum, pişman oldum, keşke okumasaydım.",
+    "klavyeye kedi bassa daha mantıklı cümle çıkardı.",
+    "sen yazınca bildirim sesinden soğuyorum yeminle.",
+    "yine boş konuşma rekoru kırmaya mı geldin?",
+    "laf anlatmaya çalışsam anlamayacaksın, o yüzden hiç yormayayım kendimi.",
+    "bi sus da ortalık biraz nefes alsın ya.",
+    "senin bu özgüvenin kaynağı ne, gerçekten merak ediyorum.",
+    "her seferinde daha saçma bi şey yazmayı nasıl başarıyorsun hayret.",
+]
+
+ALAYCI_EMOJILER = ["🤡", "💀", "🥱", "🙄", "📉", "🧢", "🗿"]
+
+SILME_LAFLARI = [
+    "mesajı sildin sanıyorsun ama ben gördüm 👀",
+    "silince utanç geçmiyor haberin olsun 💀",
+    "niye sildin lan, arkasında dursaydın yazdığının?",
+    "kanıt yok etmeye çalışmış bi de, yemezler 🤡",
+    "sildin diye unuttum mu sandın?",
+]
+
+DUZENLEME_LAFLARI = [
+    "düzenlemiş bir de, sanki ilk halini görmedik 👀",
+    "mesajı editleyince daha mantıklı olmamış haberin olsun.",
+    "ilk yazdığın da boştu, düzenlediğin de boş 💀",
 ]
 
 intents = discord.Intents.default()
@@ -66,24 +101,41 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-gecmis = defaultdict(lambda: deque(maxlen=8))  # kanal başına kısa hafıza
+gecmis = defaultdict(lambda: deque(maxlen=10))  # kanal başına kısa hafıza
 
-# ---- Kalıcı hafıza (kişi bazlı) + hedefler ----
+# ---- Kalıcı hafıza (kişi bazlı) + hedefler + ayarlar ----
 # Railway'de kalıcı olması için bir Volume bağla ve DATA_DIR=/data değişkenini ekle.
 DATA_DIR = os.getenv("DATA_DIR", ".")
 HAFIZA_DOSYA = os.path.join(DATA_DIR, "hafiza.json")
-kisi_gecmis: dict[str, list] = {}                      # "u:ID" -> son konuşmalar
-hedefler: dict[int, list[str]] = {HEDEF_ID: list(ISIM_TETIK)}  # hedef_id -> tetik isimleri
+kisi_gecmis: dict[str, list] = {}                             # "u:ID" -> son konuşmalar
+hedefler: dict[int, list[str]] = {HEDEF_ID: list(ISIM_TETIK)} # hedef_id -> tetik isimleri
+
+# Çalışma zamanı ayarları (hafiza.json içinde saklanır)
+ayarlar = {
+    "agresif_seviye": 3,              # 1: Orta, 2: Sert, 3: Tam Gaz
+    "herkese_agresif": False,         # True ise herkese agresif davranır
+    "ters_oran": RASTGELE_TERS_ORAN,  # Hedeflere rastgele cevap oranı (0.0 - 1.0)
+    "ifsa_aktif": True,               # Hedefin sildiği/düzenlediği mesajları ifşala
+    "tepki_aktif": True,              # Hedefin mesajlarına alaycı emoji tepkisi
+    "ses_atma_aktif": True,           # Hedefleri sesten otomatik atma
+}
 
 
 def hafiza_kaydet():
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
-        with open(HAFIZA_DOSYA, "w", encoding="utf-8") as f:
+        gecici = HAFIZA_DOSYA + ".tmp"
+        with open(gecici, "w", encoding="utf-8") as f:
             json.dump(
-                {"kisi_gecmis": kisi_gecmis, "hedefler": {str(k): v for k, v in hedefler.items()}},
-                f, ensure_ascii=False,
+                {
+                    "kisi_gecmis": kisi_gecmis,
+                    "hedefler": {str(k): v for k, v in hedefler.items()},
+                    "ayarlar": ayarlar,
+                },
+                f,
+                ensure_ascii=False,
             )
+        os.replace(gecici, HAFIZA_DOSYA)
     except Exception as e:
         print(f"[HAFIZA] Kaydedilemedi: {e!r}")
 
@@ -95,6 +147,9 @@ def hafiza_yukle():
         kisi_gecmis.update(d.get("kisi_gecmis", {}))
         for k, v in d.get("hedefler", {}).items():
             hedefler[int(k)] = v
+        kayitli_ayarlar = d.get("ayarlar", {})
+        if isinstance(kayitli_ayarlar, dict):
+            ayarlar.update(kayitli_ayarlar)
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -105,6 +160,7 @@ def hafiza_yukle():
 hafiza_yukle()
 session: aiohttp.ClientSession | None = None
 son_isim_tepki: dict[int, float] = {}
+son_ifsa_tepki: dict[int, float] = {}
 AI_KILIT = asyncio.Lock()
 AI_HATA = "AI servisi şu an cevap vermiyor, biraz sonra tekrar dene."
 
@@ -112,17 +168,37 @@ AI_HATA = "AI servisi şu an cevap vermiyor, biraz sonra tekrar dene."
 # ============================================================
 #  YARDIMCILAR
 # ============================================================
-async def ai_sor(prompt: str, sistem: str = SISTEM_NORMAL, kanal_id: int | None = None,
-                 kisi_id: int | None = None) -> str:
+def _mesajlari_birlestir(mesaj_listesi: list[dict]) -> list[dict]:
+    """Ardışık aynı roldeki mesajları birleştirir (API uyumluluğu için)."""
+    sonuc: list[dict] = []
+    for m in mesaj_listesi:
+        if sonuc and sonuc[-1]["role"] == m["role"]:
+            sonuc[-1] = {
+                "role": m["role"],
+                "content": f"{sonuc[-1]['content']}\n{m['content']}",
+            }
+        else:
+            sonuc.append({"role": m["role"], "content": m["content"]})
+    return sonuc
+
+
+async def ai_sor(
+    prompt: str,
+    sistem: str = SISTEM_NORMAL,
+    kanal_id: int | None = None,
+    kisi_id: int | None = None,
+) -> str:
     global session
     if session is None or session.closed:
         session = aiohttp.ClientSession()
-    mesajlar = [{"role": "system", "content": sistem}]
+    gecmis_mesajlar: list[dict] = []
     if kisi_id is not None:
-        mesajlar += kisi_gecmis.get(f"u:{kisi_id}", [])[-24:]
+        gecmis_mesajlar = kisi_gecmis.get(f"u:{kisi_id}", [])[-24:]
     elif kanal_id is not None:
-        mesajlar += list(gecmis[kanal_id])
-    mesajlar.append({"role": "user", "content": prompt})
+        gecmis_mesajlar = list(gecmis[kanal_id])
+    mesajlar = [{"role": "system", "content": sistem}]
+    mesajlar += _mesajlari_birlestir(gecmis_mesajlar + [{"role": "user", "content": prompt}])
+
     cevap = None
     async with AI_KILIT:  # anonim kullanımda aynı anda tek istek (429'u önler)
         for deneme in range(4):
@@ -160,8 +236,18 @@ def hedef_mi(user: discord.abc.User) -> bool:
     return user.id in hedefler
 
 
-def sistem_sec(user, normal=SISTEM_NORMAL):
-    return SISTEM_TERS if hedef_mi(user) else normal
+def agresif_mi(user: discord.abc.User) -> bool:
+    return bool(ayarlar["herkese_agresif"]) or hedef_mi(user)
+
+
+def aktif_ters_sistem() -> str:
+    return SISTEM_TAM_GAZ if ayarlar["agresif_seviye"] >= 3 else SISTEM_TERS
+
+
+def sistem_sec(user: discord.abc.User, normal: str = SISTEM_NORMAL) -> str:
+    if agresif_mi(user):
+        return aktif_ters_sistem()
+    return normal
 
 
 # Güvenli hesap makinesi
@@ -188,7 +274,7 @@ def guvenli_hesap(node):
 
 
 # ============================================================
-#  OLAYLAR
+#  SES YÖNETİMİ & OLAYLAR
 # ============================================================
 SES_KANAL_ID = int(os.getenv("SES_KANAL_ID", "0") or 0)  # Railway'de açılışta girilecek ses kanalı
 ses_hedef: dict[int, int] = {}  # sunucu_id -> kalınacak ses kanalı id
@@ -256,19 +342,21 @@ async def git(inter: discord.Interaction):
     await inter.response.send_message("Zaten bir ses kanalında değilim.", ephemeral=True)
 
 
-ses_atma_aktif = True  # /sesatma komutuyla açılıp kapanır
-
 SES_ATMA_LAFLARI = [
-    "Hop! Nereye? Bu kanalda işin yok.",
-    "Sese girmeye çalıştın ama kapıdan döndün. Güle güle.",
-    "Giriş yasak. Bugünlük de bu kadar.",
-    "Yine mi sen? Dışarı.",
+    "hop nereye? bu kanalda senin yerin yok, ikile.",
+    "sese girmeye çalıştın ama kapıdan çevrildin. güle güle 👋",
+    "giriş yasak kardeşim, zorlama.",
+    "yine mi sen? dışarı, hemen.",
+    "bu kanalın kalitesini düşürmene izin veremem, uçtun.",
+    "girdiğin gibi çıkarsın işte böyle 💀",
+    "seni burda istemiyorlar, anla artık.",
+    "kapı orda, bi daha deneme bence.",
 ]
 
 
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    """Botun kendi ses durumu + hedef kullanıcı bir ses kanalına girerse otomatik atma."""
+    """Botun kendi ses durumu + hedefteki kullanıcı bir ses kanalına girerse otomatik atma."""
     # Bot sesten düştüyse (atıldı/bağlantı koptu) 5 sn içinde geri dön
     if member.id == bot.user.id and after.channel is None and member.guild.id in ses_hedef:
         print(f"[SES] Bot sesten düştü ({member.guild.name}), geri dönülüyor...")
@@ -284,7 +372,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                 print(f"[SES] Geri bağlanamadı: {e!r}")
         return
 
-    if not ses_atma_aktif or member.id != HEDEF_ID:
+    if not ayarlar["ses_atma_aktif"] or not hedef_mi(member):
         return
     if after.channel is None or after.channel == before.channel:
         return
@@ -303,7 +391,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
         pass
 
 
-@bot.tree.command(name="sesatma", description="Hedef kullanıcıyı sesten otomatik atmayı aç/kapat")
+@bot.tree.command(name="sesatma", description="Hedefteki kullanıcıları sesten otomatik atmayı aç/kapat")
 @app_commands.guild_only()
 @app_commands.checks.has_permissions(move_members=True)
 @app_commands.choices(durum=[
@@ -311,15 +399,80 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
     app_commands.Choice(name="Kapat", value="kapat"),
 ])
 async def sesatma(inter: discord.Interaction, durum: app_commands.Choice[str]):
-    global ses_atma_aktif
-    ses_atma_aktif = durum.value == "ac"
-    await inter.response.send_message(f"Otomatik ses atma: **{'AÇIK' if ses_atma_aktif else 'KAPALI'}**")
+    ayarlar["ses_atma_aktif"] = durum.value == "ac"
+    hafiza_kaydet()
+    await inter.response.send_message(
+        f"Otomatik ses atma: **{'AÇIK' if ayarlar['ses_atma_aktif'] else 'KAPALI'}**"
+    )
 
 
-@sesatma.error
-async def sesatma_hata(inter: discord.Interaction, hata):
-    if isinstance(hata, app_commands.MissingPermissions):
-        await inter.response.send_message("Yetkin yok.", ephemeral=True)
+# ============================================================
+#  AGRESİF MOD & HEDEF YÖNETİMİ
+# ============================================================
+@bot.tree.command(name="agresiflik", description="Botun agresiflik seviyesini ayarla (1-3)")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.choices(seviye=[
+    app_commands.Choice(name="1 - Orta (Sivri)", value=1),
+    app_commands.Choice(name="2 - Sert (İğneleyici)", value=2),
+    app_commands.Choice(name="3 - Tam Gaz (Maksimum Agresif)", value=3),
+])
+async def agresiflik(inter: discord.Interaction, seviye: app_commands.Choice[int]):
+    ayarlar["agresif_seviye"] = seviye.value
+    hafiza_kaydet()
+    await inter.response.send_message(f"🔥 Agresiflik seviyesi **{seviye.name}** olarak ayarlandı.")
+
+
+@bot.tree.command(name="herkese_agresif", description="Botun sadece hedeflere değil HERKESE agresif olmasını aç/kapat")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.choices(durum=[
+    app_commands.Choice(name="Aç", value="ac"),
+    app_commands.Choice(name="Kapat", value="kapat"),
+])
+async def herkese_agresif(inter: discord.Interaction, durum: app_commands.Choice[str]):
+    ayarlar["herkese_agresif"] = durum.value == "ac"
+    hafiza_kaydet()
+    if ayarlar["herkese_agresif"]:
+        await inter.response.send_message("😈 **Herkese agresif mod AÇIK.** Artık kimseye acımıyorum.")
+    else:
+        await inter.response.send_message("😇 Herkese agresif mod **KAPALI**. Sadece hedeflerle uğraşacağım.")
+
+
+@bot.tree.command(name="ters_oran", description="Hedeflerin mesajlarına kendiliğinden laf atma olasılığını ayarla (%0-%100)")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(yuzde="0 ile 100 arası yüzde (örn: 50)")
+async def ters_oran(inter: discord.Interaction, yuzde: app_commands.Range[int, 0, 100]):
+    ayarlar["ters_oran"] = yuzde / 100.0
+    hafiza_kaydet()
+    await inter.response.send_message(f"🎯 Hedeflere kendiliğinden ters cevap oranı **%{yuzde}** yapıldı.")
+
+
+@bot.tree.command(name="ifsa", description="Hedeflerin sildiği/düzenlediği mesajları ifşalamayı aç/kapat")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.choices(durum=[
+    app_commands.Choice(name="Aç", value="ac"),
+    app_commands.Choice(name="Kapat", value="kapat"),
+])
+async def ifsa(inter: discord.Interaction, durum: app_commands.Choice[str]):
+    ayarlar["ifsa_aktif"] = durum.value == "ac"
+    hafiza_kaydet()
+    await inter.response.send_message(f"👀 Mesaj ifşa modu: **{'AÇIK' if ayarlar['ifsa_aktif'] else 'KAPALI'}**")
+
+
+@bot.tree.command(name="tepki_mod", description="Hedeflerin mesajlarına alaycı emoji tepkisini aç/kapat")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.choices(durum=[
+    app_commands.Choice(name="Aç", value="ac"),
+    app_commands.Choice(name="Kapat", value="kapat"),
+])
+async def tepki_mod(inter: discord.Interaction, durum: app_commands.Choice[str]):
+    ayarlar["tepki_aktif"] = durum.value == "ac"
+    hafiza_kaydet()
+    await inter.response.send_message(f"🤡 Alaycı emoji tepkisi: **{'AÇIK' if ayarlar['tepki_aktif'] else 'KAPALI'}**")
 
 
 @bot.tree.command(name="hedef_ekle", description="Birini hedefe al: bot ona ters ters odaklanır")
@@ -332,8 +485,26 @@ async def hedef_ekle(inter: discord.Interaction, kisi: discord.Member):
     hedefler[kisi.id] = isimler
     hafiza_kaydet()
     await inter.response.send_message(
-        f"🎯 {kisi.display_name} artık hedefte. Mesajlarına, etiketlerine ve ismi geçince ters cevap verecek.\n"
+        f"🎯 **{kisi.display_name}** artık hedefte. Mesajlarına, etiketlerine, ismi geçince ve sese girince peşindeyim.\n"
         f"Tetik isimleri: {', '.join(isimler) or '-'}"
+    )
+
+
+@bot.tree.command(name="tetik_ekle", description="Hedefteki kişiye özel tetikleyici kelime/lakap ekle")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(kisi="Hedefteki kişi", kelime="Mesajda geçince botu tetikleyecek lakap/kelime")
+async def tetik_ekle(inter: discord.Interaction, kisi: discord.Member, kelime: str):
+    if kisi.id not in hedefler:
+        return await inter.response.send_message("Bu kişi hedefte değil. Önce `/hedef_ekle` kullan.", ephemeral=True)
+    temiz = kelime.strip().lower()
+    if len(temiz) < 2:
+        return await inter.response.send_message("Tetik kelime en az 2 karakter olmalı.", ephemeral=True)
+    if temiz not in hedefler[kisi.id]:
+        hedefler[kisi.id].append(temiz)
+        hafiza_kaydet()
+    await inter.response.send_message(
+        f"🎯 **{kisi.display_name}** için tetik kelimeler: `{', '.join(hedefler[kisi.id])}`"
     )
 
 
@@ -349,14 +520,23 @@ async def hedef_cikar(inter: discord.Interaction, kisi: discord.Member):
     await inter.response.send_message(f"✅ {kisi.display_name} hedeften çıkarıldı.")
 
 
-@bot.tree.command(name="hedef_liste", description="Hedefteki kişileri listele")
+@bot.tree.command(name="hedef_liste", description="Hedefteki kişileri ve aktif agresif ayarları listele")
 @app_commands.guild_only()
 async def hedef_liste(inter: discord.Interaction):
     satirlar = []
-    for hid in hedefler:
+    for hid, isimler in hedefler.items():
         m = inter.guild.get_member(hid)
-        satirlar.append(f"• {m.display_name if m else hid}")
-    await inter.response.send_message("🎯 **Hedefler:**\n" + "\n".join(satirlar))
+        ad = m.display_name if m else str(hid)
+        tetikler = ", ".join(isimler) if isimler else "-"
+        satirlar.append(f"• **{ad}** (tetikler: `{tetikler}`)")
+    durum = (
+        f"\n\n⚙️ **Ayarlar:** Seviye `{ayarlar['agresif_seviye']}/3` | "
+        f"Herkese agresif: `{'AÇIK' if ayarlar['herkese_agresif'] else 'KAPALI'}` | "
+        f"Ters oran: `%{round(ayarlar['ters_oran'] * 100)}` | "
+        f"İfşa: `{'AÇIK' if ayarlar['ifsa_aktif'] else 'KAPALI'}` | "
+        f"Ses atma: `{'AÇIK' if ayarlar['ses_atma_aktif'] else 'KAPALI'}`"
+    )
+    await inter.response.send_message("🎯 **Hedefler:**\n" + "\n".join(satirlar) + durum)
 
 
 @bot.tree.command(name="hafiza_hedef_sil", description="Bir hedefin konuşma hafızasını siler")
@@ -387,8 +567,52 @@ async def on_ready():
         ses_bekci.start()
     synced = await bot.tree.sync()
     print(f"[SYNC] {len(synced)} komut: {', '.join(c.name for c in synced)}")
-    await bot.change_presence(activity=discord.Game("/yardim | @beni etiketle"))
+    await bot.change_presence(activity=discord.Game("/yardim | dikkat et laf yeme"))
     print(f"{bot.user} aktif! {len(bot.guilds)} sunucuda.")
+
+
+@bot.event
+async def on_message_delete(message: discord.Message):
+    """Hedef kullanıcı mesaj silerse kanalda ifşalar."""
+    if message.author.bot or not ayarlar["ifsa_aktif"]:
+        return
+    if not hedef_mi(message.author):
+        return
+    metin = message.content.strip()
+    if not metin:
+        return
+    simdi = time.time()
+    if simdi - son_ifsa_tepki.get(message.channel.id, 0) < IFSA_BEKLEME:
+        return
+    son_ifsa_tepki[message.channel.id] = simdi
+    kisalt = metin[:120] + ("..." if len(metin) > 120 else "")
+    try:
+        await message.channel.send(
+            f"{message.author.mention} {random.choice(SILME_LAFLARI)}\n> `{kisalt}`"
+        )
+    except Exception:
+        pass
+
+
+@bot.event
+async def on_message_edit(before: discord.Message, after: discord.Message):
+    """Hedef kullanıcı mesajını düzenlerse laf atar."""
+    if before.author.bot or not ayarlar["ifsa_aktif"]:
+        return
+    if not hedef_mi(before.author):
+        return
+    if before.content.strip() == after.content.strip() or not before.content.strip():
+        return
+    if ayarlar["agresif_seviye"] < 2:
+        return
+    simdi = time.time()
+    if simdi - son_ifsa_tepki.get(before.channel.id, 0) < IFSA_BEKLEME:
+        return
+    son_ifsa_tepki[before.channel.id] = simdi
+    try:
+        await after.reply(random.choice(DUZENLEME_LAFLARI), mention_author=False)
+    except Exception:
+        pass
 
 
 @bot.event
@@ -417,10 +641,10 @@ async def on_message(message: discord.Message):
             async with message.channel.typing():
                 cevap = await ai_sor(
                     f"Sunucuda biri şunu yazdı: \"{message.content[:400]}\"\n"
-                    f"Mesajda {isim} adlı arkadaşımızdan bahsediliyor. "
-                    f"Ona ters ters, alaycı ve komik bir şekilde laf at, mesaja da değin. "
-                    f"Geçmişte onunla konuştuklarını hatırlıyorsan kullan.",
-                    SISTEM_TERS,
+                    f"Mesajda {isim} adlı kişiden bahsediliyor. "
+                    f"Ona acımasızca, iğneleyici ve komik bir şekilde laf sok, mesaja da değin. "
+                    f"Geçmişte onun söylediklerini hatırlıyorsan yüzüne vur.",
+                    aktif_ters_sistem(),
                     kisi_id=bahsedilen,
                 )
             if cevap == AI_HATA:
@@ -428,19 +652,26 @@ async def on_message(message: discord.Message):
             await message.reply(cevap, mention_author=False)
         return
 
-    # Hedef kullanıcı: ters mod
+    # Hedef kullanıcı: ters mod + alaycı tepki + hafıza kaydı
     if hedef_mi(message.author):
-        cevap_ver = etiketlendi or yanit_mi or random.random() < RASTGELE_TERS_ORAN
-        if not cevap_ver and message.content.strip():
-            # Cevap vermesek de söylediklerini hafızaya at, ileride kullansın
-            anahtar = f"u:{message.author.id}"
-            kisi_gecmis.setdefault(anahtar, []).append({"role": "user", "content": message.content[:300]})
-            del kisi_gecmis[anahtar][:-40]
+        cevap_ver = etiketlendi or yanit_mi or random.random() < ayarlar["ters_oran"]
+        if not cevap_ver:
+            if message.content.strip():
+                # Cevap vermesek de söylediklerini hafızaya at, ileride yüzüne vursun
+                anahtar = f"u:{message.author.id}"
+                kisi_gecmis.setdefault(anahtar, []).append({"role": "user", "content": message.content[:300]})
+                del kisi_gecmis[anahtar][:-40]
+                hafiza_kaydet()
+            if ayarlar["tepki_aktif"] and random.random() < TEPKI_ORAN:
+                try:
+                    await message.add_reaction(random.choice(ALAYCI_EMOJILER))
+                except Exception:
+                    pass
         if cevap_ver:
             metin = re.sub(r"<@!?\d+>", "", message.content).strip()
             async with message.channel.typing():
                 if metin:
-                    cevap = await ai_sor(metin, SISTEM_TERS, kisi_id=message.author.id)
+                    cevap = await ai_sor(metin, aktif_ters_sistem(), kisi_id=message.author.id)
                 else:
                     cevap = random.choice(TERS_HAZIR)
             if cevap == AI_HATA:
@@ -448,12 +679,14 @@ async def on_message(message: discord.Message):
             await message.reply(cevap, mention_author=False)
             return
 
-    # Diğerleri: etiketlenirse / yanıtlanırsa AI sohbeti
+    # Diğerleri: etiketlenirse / yanıtlanırsa AI sohbeti (herkese_agresif açıksa ters!)
     elif etiketlendi or yanit_mi:
         metin = re.sub(r"<@!?\d+>", "", message.content).strip()
         if metin:
             async with message.channel.typing():
-                cevap = await ai_sor(metin, SISTEM_NORMAL, message.channel.id)
+                cevap = await ai_sor(metin, sistem_sec(message.author), message.channel.id)
+            if cevap == AI_HATA and agresif_mi(message.author):
+                cevap = random.choice(TERS_HAZIR)
             await message.reply(cevap, mention_author=False)
             return
 
@@ -467,7 +700,10 @@ async def on_message(message: discord.Message):
 @app_commands.describe(soru="Sorun nedir?")
 async def sor(inter: discord.Interaction, soru: str):
     await inter.response.defer()
-    cevap = await ai_sor(soru, sistem_sec(inter.user), inter.channel_id)
+    kisi_id = inter.user.id if hedef_mi(inter.user) else None
+    cevap = await ai_sor(soru, sistem_sec(inter.user), inter.channel_id, kisi_id=kisi_id)
+    if cevap == AI_HATA and agresif_mi(inter.user):
+        cevap = random.choice(TERS_HAZIR)
     await inter.followup.send(f"**Soru:** {soru[:300]}\n\n{cevap}")
 
 
@@ -476,7 +712,8 @@ async def sor(inter: discord.Interaction, soru: str):
 async def odev(inter: discord.Interaction, soru: str, ders: str = ""):
     await inter.response.defer()
     prompt = f"Ders: {ders}\nSoru: {soru}" if ders else soru
-    cevap = await ai_sor(prompt, sistem_sec(inter.user, SISTEM_ODEV))
+    kisi_id = inter.user.id if hedef_mi(inter.user) else None
+    cevap = await ai_sor(prompt, sistem_sec(inter.user, SISTEM_ODEV), kisi_id=kisi_id)
     await inter.followup.send(f"📚 **Ödev Yardımı**\n\n{cevap}")
 
 
@@ -484,10 +721,16 @@ async def odev(inter: discord.Interaction, soru: str, ders: str = ""):
 @app_commands.describe(metin="Çevrilecek metin", dil="Hedef dil (örn: İngilizce)")
 async def cevir(inter: discord.Interaction, metin: str, dil: str = "İngilizce"):
     await inter.response.defer()
-    cevap = await ai_sor(
-        f"Şu metni {dil} diline çevir, sadece çeviriyi yaz:\n{metin}",
-        "Sen profesyonel bir çevirmensin.",
-    )
+    if agresif_mi(inter.user):
+        cevap = await ai_sor(
+            f"Şu metni {dil} diline çevir, sonra da 'bunu bile çeviremiyorsun' havasında tek cümlelik iğneleyici bir laf ekle:\n{metin}",
+            aktif_ters_sistem(),
+        )
+    else:
+        cevap = await ai_sor(
+            f"Şu metni {dil} diline çevir, sadece çeviriyi yaz:\n{metin}",
+            "Sen profesyonel bir çevirmensin.",
+        )
     await inter.followup.send(f"🌍 **{dil}:**\n{cevap}")
 
 
@@ -495,7 +738,7 @@ async def cevir(inter: discord.Interaction, metin: str, dil: str = "İngilizce")
 @app_commands.describe(metin="Özetlenecek metin")
 async def ozet(inter: discord.Interaction, metin: str):
     await inter.response.defer()
-    cevap = await ai_sor(f"Şunu kısaca özetle:\n{metin}", SISTEM_NORMAL)
+    cevap = await ai_sor(f"Şunu kısaca özetle:\n{metin}", sistem_sec(inter.user))
     await inter.followup.send(f"📝 **Özet:**\n{cevap}")
 
 
@@ -508,7 +751,8 @@ async def ozet(inter: discord.Interaction, metin: str):
 ])
 async def acikla(inter: discord.Interaction, konu: str, seviye: app_commands.Choice[str]):
     await inter.response.defer()
-    cevap = await ai_sor(f"{konu} konusunu {seviye.value} anlat.", sistem_sec(inter.user))
+    kisi_id = inter.user.id if hedef_mi(inter.user) else None
+    cevap = await ai_sor(f"{konu} konusunu {seviye.value} anlat.", sistem_sec(inter.user), kisi_id=kisi_id)
     await inter.followup.send(f"💡 **{konu}**\n\n{cevap}")
 
 
@@ -517,7 +761,8 @@ async def acikla(inter: discord.Interaction, konu: str, seviye: app_commands.Cho
 async def hesapla(inter: discord.Interaction, ifade: str):
     try:
         sonuc = guvenli_hesap(ast.parse(ifade, mode="eval"))
-        await inter.response.send_message(f"🧮 `{ifade}` = **{sonuc}**")
+        ek = " (bunu kafadan yapamadın mı gerçekten?)" if agresif_mi(inter.user) else ""
+        await inter.response.send_message(f"🧮 `{ifade}` = **{sonuc}**{ek}")
     except Exception:
         await inter.response.send_message("Geçersiz işlem. Sadece + - * / ** % // kullan.", ephemeral=True)
 
@@ -542,6 +787,15 @@ SEKIZ_TOP = [
     "Kesinlikle evet.", "Bence evet.", "Olabilir.", "Şimdi söylemeyeyim.",
     "Hiç sanmam.", "Kesinlikle hayır.", "Tekrar sor.", "Belirtiler olumlu.",
 ]
+SEKIZ_TOP_TERS = [
+    "rüyanda görürsün.",
+    "kesinlikle hayır, boşuna umutlanma.",
+    "bunu sormaya utanmadın mı?",
+    "mucize olursa belki, ama sanmam.",
+    "hayır. bi sonraki saçma soruna geç.",
+    "kendi aklın yok mu da bana soruyorsun? hayır.",
+    "ihtimal sıfırın altında 💀",
+]
 CESARET = [
     "Son attığın mesajı sesli oku.", "Profil fotoğrafını 1 saat değiştir.",
     "En utanç verici şarkını paylaş.", "Birine komik bir hikaye anlat.",
@@ -561,7 +815,10 @@ async def espri(inter: discord.Interaction):
 @app_commands.describe(konu="Espri konusu")
 async def ai_espri(inter: discord.Interaction, konu: str):
     await inter.response.defer()
-    cevap = await ai_sor(f"'{konu}' hakkında kısa, komik, kırıcı olmayan bir espri yaz.")
+    cevap = await ai_sor(
+        f"'{konu}' hakkında kısa, zeki ve komik bir espri yaz.",
+        sistem_sec(inter.user),
+    )
     await inter.followup.send(f"😂 {cevap}")
 
 
@@ -573,13 +830,16 @@ async def yazitura(inter: discord.Interaction):
 @bot.tree.command(name="zar", description="Zar at")
 @app_commands.describe(yuz="Zarın yüz sayısı")
 async def zar(inter: discord.Interaction, yuz: app_commands.Range[int, 2, 1000] = 6):
-    await inter.response.send_message(f"🎲 d{yuz}: **{random.randint(1, yuz)}**")
+    sonuc = random.randint(1, yuz)
+    ek = " (şansın da kendin gibi yerlerde)" if agresif_mi(inter.user) and sonuc <= max(1, yuz // 4) else ""
+    await inter.response.send_message(f"🎲 d{yuz}: **{sonuc}**{ek}")
 
 
 @bot.tree.command(name="8top", description="Sihirli 8 topa sor")
 @app_commands.describe(soru="Evet/hayır sorusu")
 async def top8(inter: discord.Interaction, soru: str):
-    await inter.response.send_message(f"🎱 **{soru}**\n{random.choice(SEKIZ_TOP)}")
+    havuz = SEKIZ_TOP_TERS if agresif_mi(inter.user) else SEKIZ_TOP
+    await inter.response.send_message(f"🎱 **{soru}**\n{random.choice(havuz)}")
 
 
 @bot.tree.command(name="ship", description="İki kişinin uyumunu ölç")
@@ -587,7 +847,14 @@ async def ship(inter: discord.Interaction, kisi1: discord.Member, kisi2: discord
     rnd = random.Random(min(kisi1.id, kisi2.id) + max(kisi1.id, kisi2.id))
     oran = rnd.randint(0, 100)
     bar = "█" * (oran // 10) + "░" * (10 - oran // 10)
-    await inter.response.send_message(f"💘 {kisi1.display_name} x {kisi2.display_name}\n`{bar}` **%{oran}**")
+    yorum = ""
+    if oran < 25:
+        yorum = "\n💀 bundan hayır gelmez, uzak durun."
+    elif oran < 50:
+        yorum = "\n😬 zorlamayın bence."
+    elif oran >= 85:
+        yorum = "\n🔥 fena değil ha, idare eder."
+    await inter.response.send_message(f"💘 {kisi1.display_name} x {kisi2.display_name}\n`{bar}` **%{oran}**{yorum}")
 
 
 @bot.tree.command(name="tkm", description="Taş kağıt makas oyna")
@@ -599,12 +866,13 @@ async def ship(inter: discord.Interaction, kisi1: discord.Member, kisi2: discord
 async def tkm(inter: discord.Interaction, secim: app_commands.Choice[str]):
     bot_secim = random.choice(["tas", "kagit", "makas"])
     kazan = {("tas", "makas"), ("kagit", "tas"), ("makas", "kagit")}
+    ters = agresif_mi(inter.user)
     if secim.value == bot_secim:
-        sonuc = "Berabere!"
+        sonuc = "berabere, bu seferlik yırttın." if ters else "Berabere!"
     elif (secim.value, bot_secim) in kazan:
-        sonuc = "Sen kazandın! 🎉"
+        sonuc = "şansa kazandın, havalanma hemen." if ters else "Sen kazandın! 🎉"
     else:
-        sonuc = "Ben kazandım! 😎"
+        sonuc = "ezildin geçtin 💀 bi daha gelme." if ters else "Ben kazandım! 😎"
     isim = {"tas": "Taş", "kagit": "Kağıt", "makas": "Makas"}
     await inter.response.send_message(f"Sen: **{isim[secim.value]}** | Ben: **{isim[bot_secim]}**\n{sonuc}")
 
@@ -612,6 +880,7 @@ async def tkm(inter: discord.Interaction, secim: app_commands.Choice[str]):
 @bot.tree.command(name="sayitahmin", description="1-100 arası sayı tahmin et")
 async def sayitahmin(inter: discord.Interaction):
     sayi = random.randint(1, 100)
+    ters = agresif_mi(inter.user)
     await inter.response.send_message("🔢 1-100 arası bir sayı tuttum! 30 saniyede kanala tahminini yaz (6 hakkın var).")
 
     def kontrol(m):
@@ -621,12 +890,15 @@ async def sayitahmin(inter: discord.Interaction):
         try:
             m = await bot.wait_for("message", check=kontrol, timeout=30)
         except asyncio.TimeoutError:
-            return await inter.channel.send(f"⏰ Süre doldu! Sayı **{sayi}** idi.")
+            msg = f"⏰ uyuya mı kaldın? sayı **{sayi}** idi." if ters else f"⏰ Süre doldu! Sayı **{sayi}** idi."
+            return await inter.channel.send(msg)
         t = int(m.content)
         if t == sayi:
-            return await inter.channel.send(f"🎉 Bildin! Sayı **{sayi}**.")
+            msg = f"🎉 hayret, sonunda bildin. sayı **{sayi}**." if ters else f"🎉 Bildin! Sayı **{sayi}**."
+            return await inter.channel.send(msg)
         await inter.channel.send(f"{'⬆️ Daha büyük' if t < sayi else '⬇️ Daha küçük'} | Kalan hak: {hak - 1}")
-    await inter.channel.send(f"Kaybettin! Sayı **{sayi}** idi.")
+    msg = f"💀 6 hakta bile bilemedin ya, sayı **{sayi}** idi." if ters else f"Kaybettin! Sayı **{sayi}** idi."
+    await inter.channel.send(msg)
 
 
 @bot.tree.command(name="cesaret_dogruluk", description="Cesaret mi doğruluk mu?")
@@ -639,16 +911,36 @@ async def cd(inter: discord.Interaction, tur: app_commands.Choice[str]):
     await inter.response.send_message(f"{e} **{tur.name}:** {random.choice(liste)}")
 
 
-@bot.tree.command(name="roast", description="Birine hafif, komik bir laf at")
+@bot.tree.command(name="roast", description="Birine sert, sivri dilli bir laf sok")
 async def roast(inter: discord.Interaction, kisi: discord.Member):
     if kisi.bot:
-        return await inter.response.send_message("Botlarla uğraşma 😤", ephemeral=True)
+        return await inter.response.send_message("Botlara bulaşma, kendini yakarsın 😤", ephemeral=True)
+    await inter.response.defer()
+    kisi_id = kisi.id if f"u:{kisi.id}" in kisi_gecmis else None
+    cevap = await ai_sor(
+        f"'{kisi.display_name}' adlı sunucu üyesine 2-3 cümlelik çok sert, keskin, zeki ve "
+        f"komik bir roast (laf sokma) yaz. Geçmiş mesajlarını hatırlıyorsan mutlaka kullan. "
+        f"Ağır küfür veya kişisel/hassas konulara girmeden egosunu yerle bir et.",
+        SISTEM_TAM_GAZ,
+        kisi_id=kisi_id,
+    )
+    if cevap == AI_HATA:
+        cevap = random.choice(TERS_HAZIR)
+    await inter.followup.send(f"🔥 {kisi.mention} {cevap}")
+
+
+@bot.tree.command(name="kapistir", description="İki üyeyi AI laf sokma düellosuna çıkar")
+async def kapistir(inter: discord.Interaction, kisi1: discord.Member, kisi2: discord.Member):
+    if kisi1.id == kisi2.id:
+        return await inter.response.send_message("Kendi kendine mi kapışacak? İki farklı kişi seç.", ephemeral=True)
     await inter.response.defer()
     cevap = await ai_sor(
-        f"'{kisi.display_name}' için 2 cümlelik komik, eğlenceli, kırıcı olmayan bir laf yaz. "
-        "Küfür, ağır hakaret ve kişisel konular olmasın.",
+        f"Discord sunucusunda '{kisi1.display_name}' ile '{kisi2.display_name}' arasında kısa, "
+        f"komik ve sert bir laf sokma düellosu (roast battle) yaz. Her biri 1-2 cümle söylesin, "
+        f"sonunda acımasız bir jüri gibi kazananı ilan et. Ağır küfür ve hassas konular olmasın.",
+        SISTEM_TAM_GAZ,
     )
-    await inter.followup.send(f"🔥 {kisi.mention} {cevap}")
+    await inter.followup.send(f"⚔️ **{kisi1.display_name} vs {kisi2.display_name}**\n\n{cevap}")
 
 
 @bot.tree.command(name="hikaye", description="AI kısa hikaye yazar")
@@ -711,8 +1003,15 @@ async def anket(inter: discord.Interaction, soru: str):
 @app_commands.describe(dakika="Kaç dakika sonra", not_="Hatırlatma notu")
 async def hatirlat(inter: discord.Interaction, dakika: app_commands.Range[int, 1, 1440], not_: str):
     await inter.response.send_message(f"⏰ {dakika} dk sonra hatırlatacağım.")
-    await asyncio.sleep(dakika * 60)
-    await inter.channel.send(f"{inter.user.mention} ⏰ Hatırlatma: **{not_}**")
+
+    async def _bekle_ve_gonder():
+        await asyncio.sleep(dakika * 60)
+        try:
+            await inter.channel.send(f"{inter.user.mention} ⏰ Hatırlatma: **{not_}**")
+        except Exception:
+            pass
+
+    asyncio.create_task(_bekle_ve_gonder())
 
 
 @bot.tree.command(name="temizle", description="Mesaj siler (yetkili)")
@@ -724,18 +1023,37 @@ async def temizle(inter: discord.Interaction, adet: app_commands.Range[int, 1, 1
     await inter.followup.send(f"🗑️ {len(silinen)} mesaj silindi.")
 
 
-@temizle.error
-async def temizle_hata(inter: discord.Interaction, hata):
-    if isinstance(hata, app_commands.MissingPermissions):
-        await inter.response.send_message("Yetkin yok.", ephemeral=True)
-
-
 @bot.tree.command(name="yardim", description="Komut listesi")
 async def yardim(inter: discord.Interaction):
-    e = discord.Embed(title="🤖 Komutlar", color=discord.Color.blurple())
-    e.add_field(name="🧠 AI", value="`/sor` `/odev` `/acikla` `/cevir` `/ozet` `/hikaye` `/hafiza_sil`\nBeni etiketleyerek de sohbet edebilirsin.", inline=False)
-    e.add_field(name="🎮 Eğlence", value="`/espri` `/ai_espri` `/yazitura` `/zar` `/8top` `/ship` `/tkm` `/sayitahmin` `/cesaret_dogruluk` `/roast`", inline=False)
-    e.add_field(name="🛠️ Araçlar", value="`/hesapla` `/anket` `/hatirlat` `/avatar` `/kullanici` `/sunucu` `/ping` `/temizle`", inline=False)
+    e = discord.Embed(title="🤖 Komutlar", color=discord.Color.red())
+    e.add_field(
+        name="🧠 AI",
+        value="`/sor` `/odev` `/acikla` `/cevir` `/ozet` `/hikaye` `/hafiza_sil`\nBeni etiketleyerek de sohbet edebilirsin.",
+        inline=False,
+    )
+    e.add_field(
+        name="🔥 Agresif / Hedef Yönetimi",
+        value=(
+            "`/hedef_ekle` `/hedef_cikar` `/hedef_liste` `/tetik_ekle` `/hafiza_hedef_sil`\n"
+            "`/agresiflik` `/herkese_agresif` `/ters_oran` `/ifsa` `/tepki_mod`"
+        ),
+        inline=False,
+    )
+    e.add_field(
+        name="🎮 Eğlence",
+        value="`/roast` `/kapistir` `/espri` `/ai_espri` `/yazitura` `/zar` `/8top` `/ship` `/tkm` `/sayitahmin` `/cesaret_dogruluk`",
+        inline=False,
+    )
+    e.add_field(
+        name="🔊 Ses",
+        value="`/gel` `/git` `/sesatma`",
+        inline=False,
+    )
+    e.add_field(
+        name="🛠️ Araçlar",
+        value="`/hesapla` `/anket` `/hatirlat` `/avatar` `/kullanici` `/sunucu` `/ping` `/temizle`",
+        inline=False,
+    )
     await inter.response.send_message(embed=e)
 
 
