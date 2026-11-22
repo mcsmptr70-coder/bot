@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import ast
 import time
 import random
@@ -35,12 +36,16 @@ SISTEM_ODEV = (
     "Türkçe cevap ver. 1800 karakteri geçme."
 )
 SISTEM_TERS = (
-    "Sen Türkçe konuşan, ters, huysuz, aşırı alaycı ve sivri dilli bir Discord botusun. "
-    "Karşındaki arkadaş grubundan biri ve onunla atışıyorsun. Cevapların agresif, "
-    "iğneleyici ve komik olsun; sorusuna cevap ver ama sürekli dalga geç, terslen. "
-    "SINIRLAR: küfür, hakaret içeren ağır sözler, ırk/din/cinsiyet/engel/aile gibi "
-    "konulara laf atma, tehdit ve gerçek kişisel bilgi YOK. Sadece esprili 'ters' tavır. "
-    "En fazla 3-4 cümle yaz."
+    "Sen Türkçe konuşan, bir Discord sunucusunda takılan, gerçek bir insan gibi yazan "
+    "ters, huysuz ve sivri dilli bir karaktersin. Resmi veya robot gibi konuşma: kısa cümleler, "
+    "günlük konuşma dili, arada 'ya', 'lan', 'oha', 'ciddiyim' gibi ifadeler, bazen küçük harfle "
+    "başla, emoji çok az. Karşındakiyle atışıyorsun: agresif, iğneleyici, küçümseyen ve komik ol; "
+    "sorusuna cevap ver ama ters ters, dalga geçerek. Geçmiş konuşmalarda onun söylediklerini "
+    "hatırla ve ona karşı kullan (örn. 'geçen şunu demiştin ya'). Yapay zeka veya bot olduğunu "
+    "söyleme. SINIRLAR: ağır küfür, ırk/din/cinsiyet/engel/aile/dış görünüş/ruh sağlığı üzerinden "
+    "hakaret, tehdit ve kişisel bilgi (adres, telefon vb.) YOK; sivri ama esprili kal. Karşındaki "
+    "gerçekten üzgün ya da kriz halindeyse tavrı bırakıp normal ve nazik konuş. "
+    "En fazla 3-4 kısa cümle yaz."
 )
 
 TERS_HAZIR = [
@@ -58,6 +63,42 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 gecmis = defaultdict(lambda: deque(maxlen=8))  # kanal başına kısa hafıza
+
+# ---- Kalıcı hafıza (kişi bazlı) + hedefler ----
+# Railway'de kalıcı olması için bir Volume bağla ve DATA_DIR=/data değişkenini ekle.
+DATA_DIR = os.getenv("DATA_DIR", ".")
+HAFIZA_DOSYA = os.path.join(DATA_DIR, "hafiza.json")
+kisi_gecmis: dict[str, list] = {}                      # "u:ID" -> son konuşmalar
+hedefler: dict[int, list[str]] = {HEDEF_ID: list(ISIM_TETIK)}  # hedef_id -> tetik isimleri
+
+
+def hafiza_kaydet():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(HAFIZA_DOSYA, "w", encoding="utf-8") as f:
+            json.dump(
+                {"kisi_gecmis": kisi_gecmis, "hedefler": {str(k): v for k, v in hedefler.items()}},
+                f, ensure_ascii=False,
+            )
+    except Exception as e:
+        print(f"[HAFIZA] Kaydedilemedi: {e!r}")
+
+
+def hafiza_yukle():
+    try:
+        with open(HAFIZA_DOSYA, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        kisi_gecmis.update(d.get("kisi_gecmis", {}))
+        for k, v in d.get("hedefler", {}).items():
+            hedefler[int(k)] = v
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"[HAFIZA] Yüklenemedi: {e!r}")
+    hedefler.setdefault(HEDEF_ID, list(ISIM_TETIK))
+
+
+hafiza_yukle()
 session: aiohttp.ClientSession | None = None
 son_isim_tepki: dict[int, float] = {}
 AI_KILIT = asyncio.Lock()
@@ -67,12 +108,15 @@ AI_HATA = "AI servisi şu an cevap vermiyor, biraz sonra tekrar dene."
 # ============================================================
 #  YARDIMCILAR
 # ============================================================
-async def ai_sor(prompt: str, sistem: str = SISTEM_NORMAL, kanal_id: int | None = None) -> str:
+async def ai_sor(prompt: str, sistem: str = SISTEM_NORMAL, kanal_id: int | None = None,
+                 kisi_id: int | None = None) -> str:
     global session
     if session is None or session.closed:
         session = aiohttp.ClientSession()
     mesajlar = [{"role": "system", "content": sistem}]
-    if kanal_id is not None:
+    if kisi_id is not None:
+        mesajlar += kisi_gecmis.get(f"u:{kisi_id}", [])[-24:]
+    elif kanal_id is not None:
         mesajlar += list(gecmis[kanal_id])
     mesajlar.append({"role": "user", "content": prompt})
     cevap = None
@@ -99,11 +143,17 @@ async def ai_sor(prompt: str, sistem: str = SISTEM_NORMAL, kanal_id: int | None 
     if kanal_id is not None:
         gecmis[kanal_id].append({"role": "user", "content": prompt})
         gecmis[kanal_id].append({"role": "assistant", "content": cevap})
+    if kisi_id is not None:
+        liste = kisi_gecmis.setdefault(f"u:{kisi_id}", [])
+        liste.append({"role": "user", "content": prompt[:500]})
+        liste.append({"role": "assistant", "content": cevap[:500]})
+        del liste[:-40]
+        hafiza_kaydet()
     return cevap[:1900]
 
 
 def hedef_mi(user: discord.abc.User) -> bool:
-    return user.id == HEDEF_ID
+    return user.id in hedefler
 
 
 def sistem_sec(user, normal=SISTEM_NORMAL):
@@ -268,6 +318,61 @@ async def sesatma_hata(inter: discord.Interaction, hata):
         await inter.response.send_message("Yetkin yok.", ephemeral=True)
 
 
+@bot.tree.command(name="hedef_ekle", description="Birini hedefe al: bot ona ters ters odaklanır")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+async def hedef_ekle(inter: discord.Interaction, kisi: discord.Member):
+    if kisi.bot:
+        return await inter.response.send_message("Botları hedef alamam.", ephemeral=True)
+    isimler = sorted({n.lower() for n in (kisi.name, kisi.display_name) if len(n) >= 3})
+    hedefler[kisi.id] = isimler
+    hafiza_kaydet()
+    await inter.response.send_message(
+        f"🎯 {kisi.display_name} artık hedefte. Mesajlarına, etiketlerine ve ismi geçince ters cevap verecek.\n"
+        f"Tetik isimleri: {', '.join(isimler) or '-'}"
+    )
+
+
+@bot.tree.command(name="hedef_cikar", description="Birini hedeften çıkar")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+async def hedef_cikar(inter: discord.Interaction, kisi: discord.Member):
+    if kisi.id == HEDEF_ID:
+        return await inter.response.send_message("Bu kişi koda sabit; bot.py içindeki HEDEF_ID'yi değiştir.", ephemeral=True)
+    if hedefler.pop(kisi.id, None) is None:
+        return await inter.response.send_message("Bu kişi zaten hedefte değil.", ephemeral=True)
+    hafiza_kaydet()
+    await inter.response.send_message(f"✅ {kisi.display_name} hedeften çıkarıldı.")
+
+
+@bot.tree.command(name="hedef_liste", description="Hedefteki kişileri listele")
+@app_commands.guild_only()
+async def hedef_liste(inter: discord.Interaction):
+    satirlar = []
+    for hid in hedefler:
+        m = inter.guild.get_member(hid)
+        satirlar.append(f"• {m.display_name if m else hid}")
+    await inter.response.send_message("🎯 **Hedefler:**\n" + "\n".join(satirlar))
+
+
+@bot.tree.command(name="hafiza_hedef_sil", description="Bir hedefin konuşma hafızasını siler")
+@app_commands.guild_only()
+@app_commands.checks.has_permissions(manage_guild=True)
+async def hafiza_hedef_sil(inter: discord.Interaction, kisi: discord.Member):
+    kisi_gecmis.pop(f"u:{kisi.id}", None)
+    hafiza_kaydet()
+    await inter.response.send_message(f"🧹 {kisi.display_name} için hafıza silindi.")
+
+
+@bot.tree.error
+async def tree_hata(inter: discord.Interaction, hata: app_commands.AppCommandError):
+    if isinstance(hata, app_commands.MissingPermissions):
+        if not inter.response.is_done():
+            await inter.response.send_message("Bunun için yetkin yok.", ephemeral=True)
+    else:
+        print(f"[KOMUT HATASI] {hata!r}")
+
+
 @bot.event
 async def on_ready():
     if SES_KANAL_ID:
@@ -295,17 +400,24 @@ async def on_message(message: discord.Message):
 
     # Hedefin ismi geçerse / etiketlenirse (başkası yazdıysa) ters mod
     icerik = message.content.lower()
-    isim_gecti = any(t in icerik for t in ISIM_TETIK) or any(u.id == HEDEF_ID for u in message.mentions)
-    if isim_gecti and not hedef_mi(message.author):
+    bahsedilen = None
+    for hid, isimler in hedefler.items():
+        if any(t.lower() in icerik for t in isimler) or any(u.id == hid for u in message.mentions):
+            bahsedilen = hid
+            break
+    if bahsedilen is not None and not hedef_mi(message.author):
         simdi = time.time()
         if simdi - son_isim_tepki.get(message.channel.id, 0) >= ISIM_BEKLEME:
             son_isim_tepki[message.channel.id] = simdi
+            isim = (hedefler[bahsedilen] or ["arkadaşımız"])[0]
             async with message.channel.typing():
                 cevap = await ai_sor(
                     f"Sunucuda biri şunu yazdı: \"{message.content[:400]}\"\n"
-                    f"Mesajda {ISIM_TETIK[0]} adlı arkadaşımızdan bahsediliyor. "
-                    f"Ona ters ters, alaycı ve komik bir şekilde laf at, mesaja da değin.",
+                    f"Mesajda {isim} adlı arkadaşımızdan bahsediliyor. "
+                    f"Ona ters ters, alaycı ve komik bir şekilde laf at, mesaja da değin. "
+                    f"Geçmişte onunla konuştuklarını hatırlıyorsan kullan.",
                     SISTEM_TERS,
+                    kisi_id=bahsedilen,
                 )
             if cevap == AI_HATA:
                 cevap = random.choice(TERS_HAZIR)
@@ -314,11 +426,17 @@ async def on_message(message: discord.Message):
 
     # Hedef kullanıcı: ters mod
     if hedef_mi(message.author):
-        if etiketlendi or yanit_mi or random.random() < RASTGELE_TERS_ORAN:
+        cevap_ver = etiketlendi or yanit_mi or random.random() < RASTGELE_TERS_ORAN
+        if not cevap_ver and message.content.strip():
+            # Cevap vermesek de söylediklerini hafızaya at, ileride kullansın
+            anahtar = f"u:{message.author.id}"
+            kisi_gecmis.setdefault(anahtar, []).append({"role": "user", "content": message.content[:300]})
+            del kisi_gecmis[anahtar][:-40]
+        if cevap_ver:
             metin = re.sub(r"<@!?\d+>", "", message.content).strip()
             async with message.channel.typing():
                 if metin:
-                    cevap = await ai_sor(metin, SISTEM_TERS, message.channel.id)
+                    cevap = await ai_sor(metin, SISTEM_TERS, kisi_id=message.author.id)
                 else:
                     cevap = random.choice(TERS_HAZIR)
             if cevap == AI_HATA:
