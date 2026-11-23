@@ -583,7 +583,7 @@ async def on_ready():
         ses_bekci.start()
     synced = await bot.tree.sync()
     print(f"[SYNC] {len(synced)} komut: {', '.join(c.name for c in synced)}")
-    await bot.change_presence(activity=discord.Game("/yardim | dikkat et laf yeme"))
+    await bot.change_presence(activity=discord.Game("arasın annesiyle uğraşıyor"))
     print(f"{bot.user} aktif! {len(bot.guilds)} sunucuda.")
 
 
