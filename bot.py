@@ -20,7 +20,7 @@ TOKEN = os.getenv("DISCORD_TOKEN", "")
 HEDEF_ID = 1163556724737855629          # Varsayılan hedef kullanıcı
 RASTGELE_TERS_ORAN = 0.35              # Hedefin mesajlarına kendiliğinden cevap verme olasılığı (0-1)
 TEPKI_ORAN = 0.45                      # Cevap vermediğinde alaycı emoji tepkisi atma olasılığı (0-1)
-ISIM_TETIK = ["n0rx123"]               # Bu isimler mesajda geçerse bot ters moda girer
+ISIM_TETIK = ["PUYNA"]               # Bu isimler mesajda geçerse bot ters moda girer
 ISIM_BEKLEME = 4                       # Aynı kanalda isim tetikleme beklemesi (saniye)
 IFSA_BEKLEME = 5                       # Silinen/düzenlenen mesaj ifşası beklemesi (saniye)
 
